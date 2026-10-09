@@ -1,0 +1,41 @@
+[TITLE]
+Dummy Test Network
+
+[OPTIONS]
+FLOW_UNITS           CMS
+INFILTRATION         HORTON
+FLOW_ROUTING         KINWAVE
+LINK_OFFSETS         DEPTH
+MIN_SLOPE            0
+ALLOW_PONDING        NO
+SKIP_STEADY_STATE    NO
+START_DATE           07/19/2026
+START_TIME           00:00:00
+REPORT_START_DATE    07/19/2026
+REPORT_START_TIME    00:00:00
+END_DATE             07/19/2026
+END_TIME             01:00:00
+REPORT_STEP          00:15:00
+WET_STEP             00:05:00
+DRY_STEP             01:00:00
+ROUTING_STEP         00:00:30
+
+[JUNCTIONS]
+N1               10         2          0          0          0
+N2               9          2          0          0          0
+
+[OUTFALLS]
+N3               8          FREE                        NO
+
+[CONDUITS]
+L1               N1         N2         100        0.01       0          0          0          0
+L2               N2         N3         100        0.01       0          0          0          0
+
+[XSECTIONS]
+L1               CIRCULAR     1          0          0          0          1
+L2               CIRCULAR     1          0          0          0          1
+
+[COORDINATES]
+N1               100.000            100.000
+N2               200.000            100.000
+N3               300.000            100.000

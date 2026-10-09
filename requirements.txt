@@ -1,0 +1,4 @@
+pyswmm
+pydantic
+redis
+pandas

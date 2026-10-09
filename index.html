@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AquaTwin DFOE | Real-Time Flood Twin</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        :root {
+            --bg: #0b0c10;
+            --panel-bg: rgba(15, 20, 25, 0.65);
+            --accent: #00f0ff;
+            --safe: #00d4ff;
+            --danger: #ff2a2a;
+            --text: #e2e8f0;
+        }
+        body, html {
+            margin: 0; padding: 0; height: 100%; font-family: 'Outfit', sans-serif; background-color: var(--bg); color: var(--text); overflow: hidden;
+        }
+        #map { width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 1; background: #000; }
+        
+        /* Dark Mode Map Filter */
+        .map-tiles { filter: invert(100%) hue-rotate(180deg) brightness(90%) contrast(100%); }
+        
+        /* Premium UI HUD */
+        .ui-panel {
+            position: absolute; top: 30px; left: 30px; z-index: 1000;
+            background: var(--panel-bg); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(0, 240, 255, 0.2); border-radius: 20px;
+            padding: 30px; width: 360px; box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7), inset 0 0 20px rgba(0, 240, 255, 0.05);
+            transition: all 0.3s ease;
+        }
+        
+        .header { display: flex; align-items: center; gap: 15px; margin-bottom: 25px; }
+        .pulse-dot { width: 12px; height: 12px; background: var(--accent); border-radius: 50%; box-shadow: 0 0 10px var(--accent); animation: pulse 2s infinite; }
+        @keyframes pulse { 0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(0, 240, 255, 0.7); } 70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(0, 240, 255, 0); } 100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(0, 240, 255, 0); } }
+        
+        h1 { margin: 0; font-size: 24px; font-weight: 800; color: white; letter-spacing: 1px; text-transform: uppercase; }
+        p.subtitle { margin: 5px 0 0 0; font-size: 14px; color: #8ba2b5; letter-spacing: 0.5px; }
+        
+        .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 30px; }
+        .stat-box { 
+            background: linear-gradient(145deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
+            padding: 15px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.05);
+            position: relative; overflow: hidden;
+        }
+        .stat-label { font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; color: #64748b; margin-bottom: 8px; display: block; font-weight: 600; }
+        .stat-value { font-size: 32px; font-weight: 300; color: white; font-variant-numeric: tabular-nums; }
+        .stat-value.danger { color: var(--danger); text-shadow: 0 0 15px rgba(255, 42, 42, 0.5); }
+        
+        button {
+            width: 100%; padding: 16px; 
+            background: linear-gradient(90deg, #00d4ff, #0055ff);
+            color: white; border: none; border-radius: 12px; font-size: 16px; font-weight: 800; letter-spacing: 1px;
+            cursor: pointer; transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            text-transform: uppercase; box-shadow: 0 10px 20px rgba(0, 119, 255, 0.4);
+            position: relative; overflow: hidden;
+        }
+        button:hover { transform: translateY(-3px); box-shadow: 0 15px 25px rgba(0, 119, 255, 0.6); }
+        button:active { transform: translateY(1px); }
+        button.running { background: linear-gradient(90deg, #ff2a2a, #ff7700); box-shadow: 0 10px 20px rgba(255, 42, 42, 0.4); }
+        
+        /* Animated SVG conduits */
+        .flow-line { stroke-dasharray: 15 20; animation: flow 1s linear infinite; }
+        @keyframes flow { to { stroke-dashoffset: -35; } }
+        
+        .leaflet-popup-content-wrapper { background: rgba(10, 15, 20, 0.95); color: white; border-radius: 12px; border: 1px solid rgba(0, 240, 255, 0.3); box-shadow: 0 10px 25px rgba(0,0,0,0.8); }
+        .leaflet-popup-tip { background: rgba(10, 15, 20, 0.95); }
+        .leaflet-popup-content { margin: 15px; font-family: 'Outfit'; font-size: 14px; }
+        .popup-metric { display: flex; justify-content: space-between; margin-bottom: 5px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 5px; min-width: 150px; }
+        .popup-metric:last-child { border: none; margin: 0; padding: 0; }
+        .val { font-weight: 600; color: var(--accent); }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    
+    <div class="ui-panel">
+        <div class="header">
+            <div class="pulse-dot"></div>
+            <div>
+                <h1>Dynamic Flood Twin</h1>
+                <p class="subtitle">Guwahati Spatial Sector 4</p>
+            </div>
+        </div>
+        
+        <div class="stat-grid">
+            <div class="stat-box">
+                <span class="stat-label">Sim Time</span>
+                <span class="stat-value" id="val-time">00:00</span>
+            </div>
+            <div class="stat-box">
+                <span class="stat-label">Flooded</span>
+                <span class="stat-value" id="val-flooded">0</span>
+            </div>
+        </div>
+
+        <button id="btn-start" onclick="startSimulation()">Initialize Sim Engine</button>
+    </div>
+
+    <script>
+        // Center exactly over Barsapara Cricket Stadium
+        const map = L.map('map', { zoomControl: false }).setView([26.136, 91.745], 15.5);
+        
+        // Use completely free OpenStreetMap tiles with a CSS invert filter for dark mode!
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { 
+            attribution: '&copy; OpenStreetMap contributors',
+            className: 'map-tiles'
+        }).addTo(map);
+
+        let floodZones = {};
+        let linkLines = {};
+
+        // Extended Assam City (Guwahati) Sector matching the physical street arteries
+        const topology = {
+            nodes: {
+                J1: [26.1410, 91.7480], J2: [26.1390, 91.7485], J3: [26.1370, 91.7490],
+                J4: [26.1350, 91.7485], J5: [26.1340, 91.7460], J6: [26.1320, 91.7450],
+                OUT1: [26.1300, 91.7440],
+                S1: [26.1375, 91.7420], S2: [26.1385, 91.7450],
+                T1: [26.1300, 91.7400], T2: [26.1310, 91.7430]
+            },
+            links: [
+                { id: 'C1', from: 'J1', to: 'J2' }, { id: 'C2', from: 'J2', to: 'J3' },
+                { id: 'C3', from: 'J3', to: 'J4' }, { id: 'C4', from: 'J4', to: 'J5' },
+                { id: 'C5', from: 'J5', to: 'J6' }, { id: 'C6', from: 'J6', to: 'OUT1' },
+                { id: 'C7', from: 'S1', to: 'S2' }, { id: 'C8', from: 'S2', to: 'J2' },
+                { id: 'C9', from: 'T1', to: 'T2' }, { id: 'C10', from: 'T2', to: 'J6' }
+            ]
+        };
+
+        // Render Animated Street Network (Conduits)
+        topology.links.forEach(l => {
+            const latlngs = [topology.nodes[l.from], topology.nodes[l.to]];
+            linkLines[l.id] = L.polyline(latlngs, { 
+                color: 'rgba(0, 212, 255, 0.3)', weight: 4, className: 'flow-line' 
+            }).addTo(map);
+        });
+
+        // Render Initial Flood Puddles (Nodes)
+        Object.keys(topology.nodes).forEach(id => {
+            // L.circle radius is in actual meters! Meaning the flood puddle grows physically over the real map
+            floodZones[id] = L.circle(topology.nodes[id], {
+                radius: 2, fillColor: '#00d4ff', color: '#00d4ff', weight: 1, fillOpacity: 0.6
+            }).addTo(map);
+            floodZones[id].bindPopup(`<b>Node ${id}</b>`);
+        });
+
+        let isRunning = false;
+        function startSimulation() {
+            if(isRunning) return;
+            isRunning = true;
+            const btn = document.getElementById('btn-start');
+            btn.innerText = 'Simulation Active...';
+            btn.classList.add('running');
+            fetch('/start', { method: 'POST' });
+        }
+
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
+
+        ws.onmessage = function(event) {
+            const msg = JSON.parse(event.data);
+            if (msg.type === 'simulation.tick') {
+                const tick = msg.payload;
+                
+                // Update Time
+                const date = new Date(tick.sim_time);
+                document.getElementById('val-time').innerText = date.toTimeString().substring(0, 5);
+                
+                let floodedCount = 0;
+
+                // Dynamically expand flood puddles based on water depth
+                tick.nodes.forEach(node => {
+                    const zone = floodZones[node.node_id];
+                    if (zone) {
+                        const isFlooded = node.depth_m >= tick.critical_depth_m;
+                        if (isFlooded) floodedCount++;
+                        
+                        // Dynamic Expansion: the puddle physically expands across the streets up to massive sizes
+                        const expandedRadius = 2 + (node.depth_m * 80); 
+                        
+                        let fColor = isFlooded ? '#ff2a2a' : '#00d4ff';
+                        let opacity = Math.min(0.2 + (node.depth_m * 0.4), 0.7);
+                        
+                        zone.setRadius(expandedRadius);
+                        zone.setStyle({
+                            fillColor: fColor, color: fColor, fillOpacity: opacity, weight: isFlooded ? 2 : 1
+                        });
+                        
+                        const status = isFlooded ? '<span style="color:#ff2a2a;">CRITICAL</span>' : 'SAFE';
+                        zone.setPopupContent(`
+                            <div style="margin-bottom:8px;font-weight:800;font-size:16px;">NODE ${node.node_id}</div>
+                            <div class="popup-metric"><span>Depth:</span> <span class="val">${node.depth_m.toFixed(2)}m</span></div>
+                            <div class="popup-metric"><span>Flow:</span> <span class="val">${node.flow_cms.toFixed(2)} cms</span></div>
+                            <div class="popup-metric"><span>Status:</span> <span class="val">${status}</span></div>
+                        `);
+                    }
+                });
+
+                document.getElementById('val-flooded').innerText = floodedCount;
+                if (floodedCount > 0) document.getElementById('val-flooded').classList.add('danger');
+                else document.getElementById('val-flooded').classList.remove('danger');
+                
+                // Mutate impassable conduit colors
+                tick.links.forEach(link => {
+                    const line = linkLines[link.link_id];
+                    if (line) {
+                        if(link.passable) {
+                            line.setStyle({ color: 'rgba(0, 212, 255, 0.4)', weight: 4, className: 'flow-line' });
+                        } else {
+                            line.setStyle({ color: '#ff2a2a', weight: 6, className: '' }); // stops flowing when blocked
+                        }
+                    }
+                });
+            }
+        };
+    </script>
+</body>
+</html>

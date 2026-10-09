@@ -1,0 +1,37 @@
+[TITLE]
+;;Project Title/Notes
+Dikhow River Embankment Breach Simulation
+
+[OPTIONS]
+FLOW_UNITS           CMS
+INFILTRATION         HORTON
+FLOW_ROUTING         KINWAVE
+LINK_OFFSETS         DEPTH
+MIN_SLOPE            0
+ALLOW_PONDING        NO
+SKIP_STEADY_STATE    NO
+START_DATE           07/19/2026
+START_TIME           00:00:00
+REPORT_START_DATE    07/19/2026
+REPORT_START_TIME    00:00:00
+END_DATE             07/21/2026
+END_TIME             23:59:00
+REPORT_STEP          00:15:00
+WET_STEP             00:05:00
+DRY_STEP             01:00:00
+ROUTING_STEP         00:00:30
+
+[JUNCTIONS]
+J_DIK_001        15         10         0          0          0
+J_DIK_002        12         10         0          0          0
+
+[OUTFALLS]
+OUT_DIK_001      10         FREE                        NO
+
+[CONDUITS]
+C_DIK_001        J_DIK_001  J_DIK_002  500        0.02       0          0          0          0
+C_DIK_002        J_DIK_002  OUT_DIK_001 500        0.02       0          0          0          0
+
+[XSECTIONS]
+C_DIK_001        CIRCULAR     2          0          0          0          1
+C_DIK_002        CIRCULAR     2          0          0          0          1
